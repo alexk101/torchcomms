@@ -336,8 +336,24 @@ if [[ "${build_tests}" == true ]] || ([[ "${run_tests}" == true ]] && [[ ! -x ./
     cmake_common_options="${cmake_common_options} -DBUILD_TESTS=ON"
 fi
 
-# Add build directory to RPATH for packaging dependency resolution
-cmake_common_options="${cmake_common_options} -DCMAKE_EXE_LINKER_FLAGS=\"-Wl,-rpath,${PWD}\""
+# Add build directory to RPATH for packaging dependency resolution.
+# Optional: RCCL_EXTRA_LINKER_FLAGS (e.g. -fuse-ld=mold). Spaces in the combined
+# exe link flags cannot be passed via -D on the shell cmake line (word splitting);
+# use a -C cache snippet so clang gets separate -fuse-ld=mold and -Wl,-rpath,...
+_rccl_rpath="-Wl,-rpath,${PWD}"
+_rccl_link_init=""
+if [[ -n "${RCCL_EXTRA_LINKER_FLAGS:-}" ]]; then
+  _rccl_link_init="$(mktemp "${TMPDIR:-/tmp}/rccl_link_init.XXXXXX.cmake")" || exit 1
+  {
+    printf 'set(CMAKE_EXE_LINKER_FLAGS "%s %s" CACHE STRING "" FORCE)\n' \
+      "${RCCL_EXTRA_LINKER_FLAGS}" "${_rccl_rpath}"
+    printf 'set(CMAKE_SHARED_LINKER_FLAGS "%s" CACHE STRING "" FORCE)\n' \
+      "${RCCL_EXTRA_LINKER_FLAGS}"
+  } > "${_rccl_link_init}"
+  cmake_common_options="${cmake_common_options} -C ${_rccl_link_init}"
+else
+  cmake_common_options="${cmake_common_options} -DCMAKE_EXE_LINKER_FLAGS=${_rccl_rpath}"
+fi
 
 # Initiate RCCL CMake
 # Passing ONLY_FUNCS separately (not as part of ${cmake_common_options}) as
