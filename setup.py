@@ -133,6 +133,14 @@ class build_ext(build_ext_orig):
             f"-DUSE_TRANSPORT={flag_str(USE_TRANSPORT)}",
             f"-DUSE_TRITON={flag_str(USE_TRITON)}",
         ]
+
+        # Ensure we honor the compilers the user requested via CC/CXX.
+        # CMake will otherwise pick the first viable compiler it finds, or reuse
+        # a cached choice from a previous configure.
+        if "CC" in os.environ:
+            cmake_args.append(f"-DCMAKE_C_COMPILER={os.environ['CC']}")
+        if "CXX" in os.environ:
+            cmake_args.append(f"-DCMAKE_CXX_COMPILER={os.environ['CXX']}")
         build_args = ["--", "-j"]
 
         os.chdir(str(build_temp))
